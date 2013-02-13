@@ -1,0 +1,17 @@
+ugen3.2: <product 0x0011 vendor 0x0079> at usbus3, cfg=0 md=HOST spd=LOW (1.5Mbps) pwr=ON
+
+  bLength = 0x0012 
+  bDescriptorType = 0x0001 
+  bcdUSB = 0x0100 
+  bDeviceClass = 0x0000 
+  bDeviceSubClass = 0x0000 
+  bDeviceProtocol = 0x0000 
+  bMaxPacketSize0 = 0x0008 
+  idVendor = 0x0079 
+  idProduct = 0x0011 
+  bcdDevice = 0x0106 
+  iManufacturer = 0x0000  <no string>
+  iProduct = 0x0002  <retrieving string failed>
+  iSerialNumber = 0x0000  <no string>
+  bNumConfigurations = 0x0001 
+
