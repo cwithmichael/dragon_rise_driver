@@ -20,9 +20,9 @@ libusb_device_handle** find_snes(libusb_device **devs){
 			return NULL;
 		}
 
-		printf("%04x:%04x (bus %d, device %d)\n",
+		/*printf("%04x:%04x (bus %d, device %d)\n",
 			desc.idVendor, desc.idProduct,
-			libusb_get_bus_number(dev), libusb_get_device_address(dev));
+			libusb_get_bus_number(dev), libusb_get_device_address(dev));*/
 		
 		if(desc.idVendor==VENDOR && desc.idProduct==PRODUCT){
 			printf("Found SNES\n");
