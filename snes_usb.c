@@ -38,7 +38,7 @@ struct snes_usb_softc{
 	uint8_t sc_previous_status;
 };
 
-static device_prob_t snes_usb_probe;
+static device_probe_t snes_usb_probe;
 static device_attach_t snes_usb_attach;
 static device_detach_t snes_usb_detach;
 
@@ -65,7 +65,7 @@ static struct usb_fifo_methods snes_usb_fifo_methods = {
 
 static const struct usb_config snes_usb_config[SNES_USB_N_TRANSFER] =
 	{[SNES_USB_INTR_DT_RD] = {
-	.calback = &snes_usb_read_callback,
+	.callback = &snes_usb_read_callback,
 	.bufsize = SNES_USB_BUF_SIZE,
 	.flags = {.short_xfer_ok = 1, .pipe_bof =1, .proxy_buffer =1},
 	.type = UE_INTERRUPT,
@@ -163,7 +163,7 @@ static device_method_t snes_usb_methods[] = {
 		/*Device interface. */
 		DEVMETHOD(device_probe, snes_usb_probe),
 		DEVMETHOD(device_attach, snes_usb_attach),
-		DEVMETHOD(device_detach, snes_usb,detach),
+		DEVMETHOD(device_detach, snes_usb_detach),
 		{0,0}
 };
 
