@@ -92,6 +92,7 @@ static const struct usb_config snes_usb_config[SNES_USB_N_TRANSFER] =
 static int
 snes_usb_open(struct usb_fifo *fifo, int fflags)
 {
+	uprintf("OPENING SNES USB\n");
 	struct snes_usb_softc *sc = usb_fifo_softc(fifo);
 	int error;
 	
@@ -289,9 +290,10 @@ snes_usb_probe(device_t dev)
 	if(uaa->usb_mode != USB_MODE_HOST)
 		return (ENXIO);
 
-	if ((uaa->info.bInterfaceClass == UICLASS_HID))
+	if ((uaa->info.idVendor == 0x0079)){
+		uprintf("attached");
 		return (BUS_PROBE_SPECIFIC); 
-
+	}
 	return (ENXIO);
 }
 
@@ -303,8 +305,9 @@ snes_usb_attach(device_t dev)
 	struct usb_interface_descriptor *idesc;
 	struct usb_config_descriptor *cdesc;
 	uint8_t alt_index, iface_index = uaa->info.bIfaceIndex;
-	int error, unit = device_get_unit(dev);
-	
+	int error,unit = device_get_unit(dev);
+
+	uprintf("ATTACHING CONTROLLER\n");	
 	sc->sc_dev = dev;
 	sc->sc_usb_device = uaa->device;
 	device_set_usb_desc(dev);
@@ -349,17 +352,12 @@ found:
 		if(error)
 			goto detach;
 
-		device_printf(dev, "using unidirectonal mode\n");
+		device_printf(dev, "using unidirectional mode\n");
 		
 		error = usb_fifo_attach(uaa->device, sc, &sc->sc_mutex,
 			&snes_usb_fifo_methods, &sc->sc_fifo, unit, -1,
 			iface_index, UID_ROOT, GID_OPERATOR, 0644);
-		if(error)
-			goto detach;
 
-		error = usb_fifo_attach(uaa->device, sc, &sc->sc_mutex,
-				&snes_usb_fifo_methods, &sc->sc_fifo_no_reset, unit, -1,
-				iface_index, UID_ROOT, GID_OPERATOR, 0644);
 		if(error)
 			goto detach;
 
