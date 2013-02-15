@@ -15,23 +15,13 @@
 #include <dev/usb/usbdi_util.h>
 
 #define SNES_USB_BUF_SIZE (1 << 15)
-#define SNES_USB_IFQ_MAX_LEN 8
+#define SNES_USB_IFQ_MAX_LEN 2
 
 #define UREQ_GET_PORT_STATUS 0x01
 #define UREQ_SOFT_RESET      0x02
 
-#define UP     0x017f7f7f000f0000
-#define DOWN   0x017f7f7fff0f0000
-#define LEFT   0x017f7f00ff0f0000
-#define RIGHT  0x017f7fff7f0f0000
-#define X      0x017f7f7f7f1f0000
-#define Y      0x017f7f7f7f8f0000
-#define A      0x017f7f7f7f2f0000
-#define B      0x017f7f7f7f4f0000
-#define SELECT 0x017f7f7f7f0f1000
-#define START  0x017f7f7f7f0f2000
-#define LEFT_T 0x017f7f7f7f0f0100
-
+#define SNES_USB_X 0x30
+#define SNES_USB_Y 0x31
 
 
 enum{
@@ -84,9 +74,9 @@ static const struct usb_config snes_usb_config[SNES_USB_N_TRANSFER] =
 	{[SNES_USB_INTR_DT_RD] = {
 	.callback = &snes_usb_read_callback,
 	.bufsize = SNES_USB_BUF_SIZE,
-	.flags = {.short_xfer_ok = 1, .short_frames_ok = 1, .pipe_bof =1, .proxy_buffer =1},
+	.flags = {.short_xfer_ok = 1, .pipe_bof =1, .proxy_buffer =1},
 	.type = UE_INTERRUPT,
-	.endpoint = 0x81,
+	.endpoint = UE_ADDR_ANY,
 	.direction = UE_DIR_IN
 	},
 	[SNES_USB_STATUS_DT_RD] = {
@@ -106,24 +96,24 @@ snes_usb_open(struct usb_fifo *fifo, int fflags)
 	struct snes_usb_softc *sc = usb_fifo_softc(fifo);
 	int error;
 	
-	if(sc->sc_fflags & fflags){
+	if(sc->sc_fflags == 0)
 		snes_usb_reset(sc);
-		return (EBUSY);	
+	
+	if(fflags & FREAD){
+		mtx_lock(&sc->sc_mutex);
+		usbd_xfer_set_stall(sc->sc_transfer[SNES_USB_INTR_DT_RD]);
+		mtx_unlock(&sc->sc_mutex);
+
+		error = usb_fifo_alloc_buffer(fifo,
+			usbd_xfer_max_len(sc->sc_transfer[SNES_USB_INTR_DT_RD]),
+			SNES_USB_IFQ_MAX_LEN);
+		if(error)
+			return (ENOMEM);
+
+		sc->sc_fifo_open[USB_FIFO_RX] = fifo;
 	}
 	
-	mtx_lock(&sc->sc_mutex);
-	usbd_xfer_set_stall(sc->sc_transfer[SNES_USB_INTR_DT_RD]);
-	mtx_unlock(&sc->sc_mutex);
-
-	error = usb_fifo_alloc_buffer(fifo,
-		usbd_xfer_max_len(sc->sc_transfer[SNES_USB_INTR_DT_RD]),
-		SNES_USB_IFQ_MAX_LEN);
-	if(error)
-		return (ENOMEM);
-
-	sc->sc_fifo_open[USB_FIFO_RX] = fifo;
-	
-	//sc->sc_fflags |= fflags & FREAD;
+	sc->sc_fflags |= fflags & FREAD;
 	return (0);
 }	 
 
@@ -155,19 +145,16 @@ snes_usb_reset(struct snes_usb_softc *sc)
 static void
 snes_usb_close(struct usb_fifo *fifo, int fflags)
 {
-	uprintf("CLOSING SNES USB\n");
 	struct snes_usb_softc *sc = usb_fifo_softc(fifo);
 	
 	sc->sc_fflags &= ~(fflags & FREAD);
-	usb_fifo_free_buffer(fifo);
+	if(fflags & FREAD)
+		usb_fifo_free_buffer(fifo);
 }
 
 static int
 snes_usb_ioctl(struct usb_fifo *fifo, u_long cmd, void *data, int fflags)
 {
-	uprintf("SOMEONE CAME\n");
-	struct snes_usb_softc *sc = usb_fifo_softc(fifo);
-	device_printf(sc->sc_dev, "SOMEONE CAME\n");
 	return (ENODEV);
 }
 
@@ -205,10 +192,12 @@ snes_usb_read_callback(struct usb_xfer *transfer, usb_error_t error)
 	struct usb_fifo *fifo = sc->sc_fifo_open[USB_FIFO_RX];
 	struct usb_page_cache *pc;
 	int actual, max;
-	uint8_t current_status;
+
 	usbd_xfer_status(transfer, &actual, NULL, NULL, NULL);
+	
 	if(fifo == NULL)
 		return;
+
 	switch(USB_GET_STATE(transfer)){
 	
 		case USB_ST_TRANSFERRED:
@@ -226,7 +215,6 @@ snes_usb_read_callback(struct usb_xfer *transfer, usb_error_t error)
 			}
 
 			pc = usbd_xfer_get_frame(transfer, 0);
-			usbd_copy_out(pc, 0, &current_status, 1);
 			usb_fifo_put_data(fifo, pc, 0, actual, 1);
 			/*FALLTHROUGH*/
 
@@ -282,8 +270,14 @@ snes_usb_status_callback(struct usb_xfer *transfer, usb_error_t error)
 		case USB_ST_TRANSFERRED:
 			pc = usbd_xfer_get_frame(transfer, 1);
 			usbd_copy_out(pc, 0, &current_status, 1);
+
 			new_status = current_status & ~sc->sc_previous_status;
 			sc->sc_previous_status = current_status;
+
+			if(current_status & 0x017f7f7f000f0000)
+			{
+				device_printf(dev,"PRESSED UP\n");
+			}
 			break;
 		default:
 			break;
@@ -300,6 +294,7 @@ snes_usb_probe(device_t dev)
 		return (ENXIO);
 
 	if ((uaa->info.idVendor == 0x0079)){
+		uprintf("attached");
 		return (BUS_PROBE_SPECIFIC); 
 	}
 	return (ENXIO);
@@ -315,6 +310,7 @@ snes_usb_attach(device_t dev)
 	uint8_t alt_index, iface_index = uaa->info.bIfaceIndex;
 	int error,unit = device_get_unit(dev);
 
+	uprintf("ATTACHING CONTROLLER\n");	
 	sc->sc_dev = dev;
 	sc->sc_usb_device = uaa->device;
 	device_set_usb_desc(dev);
@@ -359,6 +355,8 @@ found:
 		if(error)
 			goto detach;
 
+		device_printf(dev, "using unidirectional mode\n");
+		
 		error = usb_fifo_attach(uaa->device, sc, &sc->sc_mutex,
 			&snes_usb_fifo_methods, &sc->sc_fifo, unit, -1,
 			iface_index, UID_ROOT, GID_OPERATOR, 0644);
