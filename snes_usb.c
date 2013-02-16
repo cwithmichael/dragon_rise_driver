@@ -20,17 +20,18 @@
 #define UREQ_GET_PORT_STATUS 0x01
 #define UREQ_SOFT_RESET      0x02
 
-#define UP     0x017f7f7f000f0000
-#define DOWN   0x017f7f7fff0f0000
-#define LEFT   0x017f7f00ff0f0000
-#define RIGHT  0x017f7fff7f0f0000
-#define X      0x017f7f7f7f1f0000
-#define Y      0x017f7f7f7f8f0000
-#define A      0x017f7f7f7f2f0000
-#define B      0x017f7f7f7f4f0000
-#define SELECT 0x017f7f7f7f0f1000
-#define START  0x017f7f7f7f0f2000
-#define LEFT_T 0x017f7f7f7f0f0100
+#define UP     0x7f00
+#define DOWN   0x7fff
+#define LEFT   0x00ff
+#define RIGHT  0xff7f
+#define X      0x1f
+#define Y      0x8f
+#define A      0x2f
+#define B      0x4f
+#define SELECT 0x10
+#define START  0x20
+#define LEFT_T 0x01
+#define RIGHT_T 0x02
 
 
 
@@ -231,29 +232,29 @@ snes_usb_read_callback(struct usb_xfer *transfer, usb_error_t error)
 			/*BUTTON PRESSED*/
 			if(current_status[1] == 0x7f && current_status[2] == 0x7f && current_status[3] == 0x7f
 				&& current_status[4] == 0x7f){
-				if(current_status[5] == 0x1f){
-					printf("X BUTTON WAS PRESSED\n");
+				if(current_status[5] == X){
+					uprintf("X BUTTON WAS PRESSED\n");
 				}
-				if(current_status[5] == 0x8f){
-					printf("Y BUTTON WAS PRESSED\n");
+				if(current_status[5] == Y){
+					uprintf("Y BUTTON WAS PRESSED\n");
 				}
-		        if(current_status[5] == 0x2f){
-					printf("A BUTTON WAS PRESSED\n");
+		        if(current_status[5] == A){
+					uprintf("A BUTTON WAS PRESSED\n");
 				}
-				if(current_status[5] == 0x4f){
-					printf("B BUTTON WAS PRESSED\n");
+				if(current_status[5] == B){
+					uprintf("B BUTTON WAS PRESSED\n");
 				}
-				if(current_status[6] == 0x10){
-					printf("SELECT BUTTON WAS PRESSED\n");
+				if(current_status[6] == SELECT){
+					uprintf("SELECT BUTTON WAS PRESSED\n");
 				}
-				if(current_status[6] == 0x20){
-					printf("START BUTTON WAS PRESSED\n");
+				if(current_status[6] == START){
+					uprintf("START BUTTON WAS PRESSED\n");
 				}
-				if(current_status[6] == 0x01){
-					printf("LEFT TRIGGER WAS PRESSED\n");
+				if(current_status[6] == LEFT_T){
+					uprintf("LEFT TRIGGER WAS PRESSED\n");
 				}
-				if(current_status[6] == 0x02){
-					printf("RIGHT TRIGGER WAS PRESSED\n");
+				if(current_status[6] == RIGHT_T){
+					uprintf("RIGHT TRIGGER WAS PRESSED\n");
 				}	
 			}
 
