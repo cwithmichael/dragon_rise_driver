@@ -83,7 +83,8 @@ static struct usb_fifo_methods snes_usb_fifo_methods = {
 static const struct usb_config snes_usb_config[SNES_USB_N_TRANSFER] =
 	{[SNES_USB_INTR_DT_RD] = {
 	.callback = &snes_usb_read_callback,
-	.bufsize = SNES_USB_BUF_SIZE,
+//	.bufsize = SNES_USB_BUF_SIZE,
+	.bufsize = sizeof(struct usb_device_request) +1,
 	.flags = {.short_xfer_ok = 1, .short_frames_ok = 1, .pipe_bof =1, .proxy_buffer =1},
 	.type = UE_INTERRUPT,
 	.endpoint = 0x81,
@@ -205,7 +206,7 @@ snes_usb_read_callback(struct usb_xfer *transfer, usb_error_t error)
 	struct usb_fifo *fifo = sc->sc_fifo_open[USB_FIFO_RX];
 	struct usb_page_cache *pc;
 	int actual, max;
-	uint8_t current_status;
+	uint8_t current_status[8];
 	usbd_xfer_status(transfer, &actual, NULL, NULL, NULL);
 	if(fifo == NULL)
 		return;
@@ -224,10 +225,16 @@ snes_usb_read_callback(struct usb_xfer *transfer, usb_error_t error)
 				usbd_xfer_set_interval(transfer, 0);
 				sc->sc_zero_length_packets = 0;
 			}
-
 			pc = usbd_xfer_get_frame(transfer, 0);
-			usbd_copy_out(pc, 0, &current_status, 1);
-			usb_fifo_put_data(fifo, pc, 0, actual, 1);
+			while(actual >= 4){
+			usbd_copy_out(pc, 0, current_status, 8);
+			for(int i = 0; i < 8; i++){
+			printf("%02x ", current_status[i]);
+			}
+		    printf("\n");	
+			usb_fifo_put_data_linear(fifo, current_status + 1,  actual, 1);
+			actual -=4;
+			}
 			/*FALLTHROUGH*/
 
 		case USB_ST_SETUP:
