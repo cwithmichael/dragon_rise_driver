@@ -83,7 +83,6 @@ static struct usb_fifo_methods snes_usb_fifo_methods = {
 static const struct usb_config snes_usb_config[SNES_USB_N_TRANSFER] =
 	{[SNES_USB_INTR_DT_RD] = {
 	.callback = &snes_usb_read_callback,
-//	.bufsize = SNES_USB_BUF_SIZE,
 	.bufsize = sizeof(struct usb_device_request) +1,
 	.flags = {.short_xfer_ok = 1, .short_frames_ok = 1, .pipe_bof =1, .proxy_buffer =1},
 	.type = UE_INTERRUPT,
@@ -228,10 +227,36 @@ snes_usb_read_callback(struct usb_xfer *transfer, usb_error_t error)
 			pc = usbd_xfer_get_frame(transfer, 0);
 			while(actual >= 4){
 			usbd_copy_out(pc, 0, current_status, 8);
-			for(int i = 0; i < 8; i++){
-			printf("%02x ", current_status[i]);
+
+			/*BUTTON PRESSED*/
+			if(current_status[1] == 0x7f && current_status[2] == 0x7f && current_status[3] == 0x7f
+				&& current_status[4] == 0x7f){
+				if(current_status[5] == 0x1f){
+					printf("X BUTTON WAS PRESSED\n");
+				}
+				if(current_status[5] == 0x8f){
+					printf("Y BUTTON WAS PRESSED\n");
+				}
+		        if(current_status[5] == 0x2f){
+					printf("A BUTTON WAS PRESSED\n");
+				}
+				if(current_status[5] == 0x4f){
+					printf("B BUTTON WAS PRESSED\n");
+				}
+				if(current_status[6] == 0x10){
+					printf("SELECT BUTTON WAS PRESSED\n");
+				}
+				if(current_status[6] == 0x20){
+					printf("START BUTTON WAS PRESSED\n");
+				}
+				if(current_status[6] == 0x01){
+					printf("LEFT TRIGGER WAS PRESSED\n");
+				}
+				if(current_status[6] == 0x02){
+					printf("RIGHT TRIGGER WAS PRESSED\n");
+				}	
 			}
-		    printf("\n");	
+
 			usb_fifo_put_data_linear(fifo, current_status + 1,  actual, 1);
 			actual -=4;
 			}
