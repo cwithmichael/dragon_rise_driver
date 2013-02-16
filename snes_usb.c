@@ -234,35 +234,27 @@ snes_usb_read_callback(struct usb_xfer *transfer, usb_error_t error)
 				&& current_status[4] == 0x7f){
 				if(current_status[5] == X){
 					device_printf(sc->sc_dev,"X BUTTON WAS PRESSED\n");
-					break;
 				}
 				if(current_status[5] == Y){
 					device_printf(sc->sc_dev,"Y BUTTON WAS PRESSED\n");
-					break;
 				}
 		        if(current_status[5] == A){
 					device_printf(sc->sc_dev,"A BUTTON WAS PRESSED\n");
-					break;
 				}
 				if(current_status[5] == B){
 					device_printf(sc->sc_dev,"B BUTTON WAS PRESSED\n");
-					break;
 				}
 				if(current_status[6] == SELECT){
 					device_printf(sc->sc_dev,"SELECT BUTTON WAS PRESSED\n");
-					break;
 				}
 				if(current_status[6] == START){
 					device_printf(sc->sc_dev,"START BUTTON WAS PRESSED\n");
-					break;
 				}
 				if(current_status[6] == LEFT_T){
 					device_printf(sc->sc_dev,"LEFT TRIGGER WAS PRESSED\n");
-					break;
 				}
 				if(current_status[6] == RIGHT_T){
 					device_printf(sc->sc_dev,"RIGHT TRIGGER WAS PRESSED\n");
-					break;
 				}	
 			}
 
