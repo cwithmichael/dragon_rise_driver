@@ -233,28 +233,36 @@ snes_usb_read_callback(struct usb_xfer *transfer, usb_error_t error)
 			if(current_status[1] == 0x7f && current_status[2] == 0x7f && current_status[3] == 0x7f
 				&& current_status[4] == 0x7f){
 				if(current_status[5] == X){
-					uprintf("X BUTTON WAS PRESSED\n");
+					device_printf(sc->sc_dev,"X BUTTON WAS PRESSED\n");
+					break;
 				}
 				if(current_status[5] == Y){
-					uprintf("Y BUTTON WAS PRESSED\n");
+					device_printf(sc->sc_dev,"Y BUTTON WAS PRESSED\n");
+					break;
 				}
 		        if(current_status[5] == A){
-					uprintf("A BUTTON WAS PRESSED\n");
+					device_printf(sc->sc_dev,"A BUTTON WAS PRESSED\n");
+					break;
 				}
 				if(current_status[5] == B){
-					uprintf("B BUTTON WAS PRESSED\n");
+					device_printf(sc->sc_dev,"B BUTTON WAS PRESSED\n");
+					break;
 				}
 				if(current_status[6] == SELECT){
-					uprintf("SELECT BUTTON WAS PRESSED\n");
+					device_printf(sc->sc_dev,"SELECT BUTTON WAS PRESSED\n");
+					break;
 				}
 				if(current_status[6] == START){
-					uprintf("START BUTTON WAS PRESSED\n");
+					device_printf(sc->sc_dev,"START BUTTON WAS PRESSED\n");
+					break;
 				}
 				if(current_status[6] == LEFT_T){
-					uprintf("LEFT TRIGGER WAS PRESSED\n");
+					device_printf(sc->sc_dev,"LEFT TRIGGER WAS PRESSED\n");
+					break;
 				}
 				if(current_status[6] == RIGHT_T){
-					uprintf("RIGHT TRIGGER WAS PRESSED\n");
+					device_printf(sc->sc_dev,"RIGHT TRIGGER WAS PRESSED\n");
+					break;
 				}	
 			}
 
@@ -444,8 +452,7 @@ static driver_t snes_usb_driver = {
 
 static devclass_t snes_usb_devclass;
 
-DRIVER_MODULE(snes_usb, uhub, snes_usb_driver, snes_usb_devclass, 0, 0);
+DRIVER_MODULE(snes_usb, uhub, snes_usb_driver, snes_usb_devclass, NULL, 0);
 MODULE_DEPEND(snes_usb, usb, 1, 1, 1);
-MODULE_DEPEND(snes_usb, ucom, 1, 1, 1);
 
 
