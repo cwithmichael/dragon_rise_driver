@@ -14,6 +14,15 @@
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdi_util.h>
 
+#include <dev/usb/usbhid.h>
+#include <dev/usb/usb_ioctl.h>
+
+#define	USB_DEBUG_VAR uhid_debug
+#include <dev/usb/usb_debug.h>
+
+#include <dev/usb/input/usb_rdesc.h>
+#include <dev/usb/quirk/usb_quirk.h>
+
 #define SNES_USB_BUF_SIZE (1 << 15)
 #define SNES_USB_IFQ_MAX_LEN 8
 
@@ -33,6 +42,7 @@
 #define LEFT_T 0x01
 #define RIGHT_T 0x02
 
+static const uint8_t uhid_snes_usb_report_descr[] = {UHID_SNES_USB_REPORT_DESCR()};
 
 
 enum{
@@ -54,6 +64,22 @@ struct snes_usb_softc{
 	struct usb_fifo *sc_fifo_open[2];
 	uint8_t sc_zero_length_packets;
 	uint8_t sc_previous_status;
+	uint8_t sc_iid;
+	uint8_t sc_oid;
+	uint8_t sc_fid;
+	uint8_t sc_iface_index;
+
+	uint32_t sc_isize;
+	uint32_t sc_osize;
+	uint32_t sc_fsize;
+
+	void *sc_repdesc_ptr;
+	
+	uint16_t sc_repdesc_size;
+	
+	struct usb_device *sc_udev;
+	#define	UHID_FLAG_IMMED        0x01	/* set if read should be immediate */
+
 };
 
 static device_probe_t snes_usb_probe;
@@ -99,6 +125,77 @@ static const struct usb_config snes_usb_config[SNES_USB_N_TRANSFER] =
 	.direction = UE_DIR_ANY
 	}
 };
+
+static int
+uhid_get_report(struct snes_usb_softc *sc, uint8_t type,
+    uint8_t id, void *kern_data, void *user_data,
+    uint16_t len)
+{
+	int err;
+	uint8_t free_data = 0;
+
+	if (kern_data == NULL) {
+		kern_data = malloc(len, M_USBDEV, M_WAITOK);
+		if (kern_data == NULL) {
+			err = ENOMEM;
+			goto done;
+		}
+		free_data = 1;
+	}
+	err = usbd_req_get_report(sc->sc_udev, NULL, kern_data,
+	    len, sc->sc_iface_index, type, id);
+	uprintf((char *)kern_data);
+	if (err) {
+		err = ENXIO;
+		goto done;
+	}
+	if (user_data) {
+		/* dummy buffer */
+		err = copyout(kern_data, user_data, len);
+		if (err) {
+			goto done;
+		}
+	}
+done:
+	if (free_data) {
+		free(kern_data, M_USBDEV);
+	}
+	return (err);
+}
+
+static int
+uhid_set_report(struct snes_usb_softc *sc, uint8_t type,
+    uint8_t id, void *kern_data, void *user_data,
+    uint16_t len)
+{
+	int err;
+	uint8_t free_data = 0;
+
+	if (kern_data == NULL) {
+		kern_data = malloc(len, M_USBDEV, M_WAITOK);
+		if (kern_data == NULL) {
+			err = ENOMEM;
+			goto done;
+		}
+		free_data = 1;
+		err = copyin(user_data, kern_data, len);
+		if (err) {
+			goto done;
+		}
+	}
+	err = usbd_req_set_report(sc->sc_udev, NULL, kern_data,
+	    len, sc->sc_iface_index, type, id);
+	if (err) {
+		err = ENXIO;
+		goto done;
+	}
+done:
+	if (free_data) {
+		free(kern_data, M_USBDEV);
+	}
+	return (err);
+}
+
 
 static int
 snes_usb_open(struct usb_fifo *fifo, int fflags)
@@ -166,8 +263,123 @@ snes_usb_close(struct usb_fifo *fifo, int fflags)
 static int
 snes_usb_ioctl(struct usb_fifo *fifo, u_long cmd, void *data, int fflags)
 {
-	uprintf("SOMEONE CAME\n");
 	struct snes_usb_softc *sc = usb_fifo_softc(fifo);
+	struct usb_gen_descriptor *ugd;
+	uint32_t size;
+	int error = 0;
+	uint8_t id;
+
+	switch(cmd){
+		case USB_GET_REPORT_DESC:
+			uprintf("GETTING REPORT DESC\n");
+			ugd = data;
+			if(sc->sc_repdesc_size > ugd->ugd_maxlen){
+				size = ugd->ugd_maxlen;
+			}
+			else{
+				size = sc->sc_repdesc_size;
+			}
+
+			ugd->ugd_actlen = size;
+			if(ugd->ugd_data == NULL)
+				break; /*desciptor length only*/
+			error = copyout(sc->sc_repdesc_ptr, ugd->ugd_data, size);
+			break;
+
+		case USB_SET_IMMED:
+			uprintf("SET IMMED\n");
+			if(!(fflags & FREAD)){
+				error = EPERM;
+				break;
+			}
+
+			if(*(int *)data){
+				/* do a test read */
+
+				error = uhid_get_report(sc, UHID_INPUT_REPORT,
+			    sc->sc_iid, NULL, NULL, sc->sc_isize);
+			if (error) {
+				break;
+			}
+			mtx_lock(&sc->sc_mutex);
+			sc->sc_fflags |= UHID_FLAG_IMMED;
+			mtx_unlock(&sc->sc_mutex);
+		} else {
+			mtx_lock(&sc->sc_mutex);
+			sc->sc_fflags &= ~UHID_FLAG_IMMED;
+			mtx_unlock(&sc->sc_mutex);
+		}
+		break;
+
+	case USB_GET_REPORT:
+		uprintf("GETTING REPORT\n");
+		if (!(fflags & FREAD)) {
+			error = EPERM;
+			break;
+		}
+		ugd = data;
+		switch (ugd->ugd_report_type) {
+		case UHID_INPUT_REPORT:
+			size = sc->sc_isize;
+			id = sc->sc_iid;
+			uprintf("%d \n", id);
+			break;
+		case UHID_OUTPUT_REPORT:
+			size = sc->sc_osize;
+			id = sc->sc_oid;
+			break;
+		case UHID_FEATURE_REPORT:
+			size = sc->sc_fsize;
+			id = sc->sc_fid;
+			break;
+		default:
+			return (EINVAL);
+		}
+		if (id != 0)
+			copyin(ugd->ugd_data, &id, 1);
+		error = uhid_get_report(sc, ugd->ugd_report_type, id,
+		    NULL, ugd->ugd_data, imin(ugd->ugd_maxlen, size));
+		break;
+
+	case USB_SET_REPORT:
+		if (!(fflags & FWRITE)) {
+			error = EPERM;
+			break;
+		}
+		ugd = data;
+		switch (ugd->ugd_report_type) {
+		case UHID_INPUT_REPORT:
+			size = sc->sc_isize;
+			id = sc->sc_iid;
+			break;
+		case UHID_OUTPUT_REPORT:
+			size = sc->sc_osize;
+			id = sc->sc_oid;
+			break;
+		case UHID_FEATURE_REPORT:
+			size = sc->sc_fsize;
+			id = sc->sc_fid;
+			break;
+		default:
+			return (EINVAL);
+		}
+		if (id != 0)
+			copyin(ugd->ugd_data, &id, 1);
+		error = uhid_set_report(sc, ugd->ugd_report_type, id,
+		    NULL, ugd->ugd_data, imin(ugd->ugd_maxlen, size));
+		break;
+
+	case USB_GET_REPORT_ID:
+		*(int *)data = 0;	/* XXX: we only support reportid 0? */
+		break;
+
+	default:
+		error = EINVAL;
+		break;
+	}
+	return (error);
+
+		
 	device_printf(sc->sc_dev, "SOMEONE CAME\n");
 	return (ENODEV);
 }
@@ -226,40 +438,10 @@ snes_usb_read_callback(struct usb_xfer *transfer, usb_error_t error)
 				sc->sc_zero_length_packets = 0;
 			}
 			pc = usbd_xfer_get_frame(transfer, 0);
-			while(actual >= 4){
+			while(actual >= 8){
 			usbd_copy_out(pc, 0, current_status, 8);
-
-			/*BUTTON PRESSED*/
-			if(current_status[1] == 0x7f && current_status[2] == 0x7f && current_status[3] == 0x7f
-				&& current_status[4] == 0x7f){
-				if(current_status[5] == X){
-					device_printf(sc->sc_dev,"X BUTTON WAS PRESSED\n");
-				}
-				if(current_status[5] == Y){
-					device_printf(sc->sc_dev,"Y BUTTON WAS PRESSED\n");
-				}
-		        if(current_status[5] == A){
-					device_printf(sc->sc_dev,"A BUTTON WAS PRESSED\n");
-				}
-				if(current_status[5] == B){
-					device_printf(sc->sc_dev,"B BUTTON WAS PRESSED\n");
-				}
-				if(current_status[6] == SELECT){
-					device_printf(sc->sc_dev,"SELECT BUTTON WAS PRESSED\n");
-				}
-				if(current_status[6] == START){
-					device_printf(sc->sc_dev,"START BUTTON WAS PRESSED\n");
-				}
-				if(current_status[6] == LEFT_T){
-					device_printf(sc->sc_dev,"LEFT TRIGGER WAS PRESSED\n");
-				}
-				if(current_status[6] == RIGHT_T){
-					device_printf(sc->sc_dev,"RIGHT TRIGGER WAS PRESSED\n");
-				}	
-			}
-
-			usb_fifo_put_data_linear(fifo, current_status + 1,  actual, 1);
-			actual -=4;
+			usb_fifo_put_data_linear(fifo, current_status + 1,  8, 1);
+			actual -=8;
 			}
 			/*FALLTHROUGH*/
 
@@ -392,9 +574,13 @@ found:
 		if(error)
 			goto detach;
 
+		uprintf("ITS A DRAGON\n");
 		error = usb_fifo_attach(uaa->device, sc, &sc->sc_mutex,
 			&snes_usb_fifo_methods, &sc->sc_fifo, unit, -1,
 			iface_index, UID_ROOT, GID_OPERATOR, 0644);
+			sc->sc_repdesc_size = sizeof(uhid_snes_usb_report_descr);
+			sc->sc_repdesc_ptr = (void *)&uhid_snes_usb_report_descr;
+
 
 		if(error)
 			goto detach;
