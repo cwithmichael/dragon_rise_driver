@@ -24,7 +24,7 @@
 #define	USB_DEBUG_VAR uhid_debug
 #include <dev/usb/usb_debug.h>
 
-#include <dev/usb/input/usb_rdesc.h>
+#include "snes_rdesc.h"
 #include <dev/usb/quirk/usb_quirk.h>
 
 #define SNES_USB_BUF_SIZE (1 << 15)
