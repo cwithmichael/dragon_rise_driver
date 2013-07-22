@@ -33,19 +33,6 @@
 #define UREQ_GET_PORT_STATUS 0x01
 #define UREQ_SOFT_RESET      0x02
 
-#define UP     0x7f00
-#define DOWN   0x7fff
-#define LEFT   0x00ff
-#define RIGHT  0xff7f
-#define X      0x1f
-#define Y      0x8f
-#define A      0x2f
-#define B      0x4f
-#define SELECT 0x10
-#define START  0x20
-#define LEFT_T 0x01
-#define RIGHT_T 0x02
-
 static const uint8_t uhid_snes_usb_report_descr[] = {UHID_SNES_USB_REPORT_DESCR()};
 
 
@@ -501,9 +488,6 @@ snes_usb_status_callback(struct usb_xfer *transfer, usb_error_t error)
 			pc = usbd_xfer_get_frame(transfer, 1);
 			usbd_copy_out(pc, 0, &current_status, 1);
 			new_status = current_status & ~sc->sc_previous_status;
-			if(new_status & START){
-			  log(LOG_NOTICE, "START\n");
-			}
 			sc->sc_previous_status = current_status;
 			break;
 		default:
