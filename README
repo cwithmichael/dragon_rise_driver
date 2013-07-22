@@ -1,1 +1,12 @@
 Driver for Dragon Rise SNES USB controller
+You should probably set the global variable OBJMAKEDIR to a new directory within the source folder.
+
+setenv OBJMAKEDIR /some/directory
+
+#make
+
+#kldload /some/directory/joy.ko
+
+Once you plug in the gamepad you should be able to use it with the emulator of your choice. I've only tested it with ZSNES and Snes9x.
+
+
