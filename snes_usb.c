@@ -108,7 +108,7 @@ static struct usb_fifo_methods snes_usb_fifo_methods = {
 	.f_ioctl = &snes_usb_ioctl,
 	.f_start_read =&snes_usb_start_read,
 	.f_stop_read = &snes_usb_stop_read,
-	.basename[0] = "joy"
+	.basename[0] = "uhid"
 };
 
 static const struct usb_config snes_usb_config[SNES_USB_N_TRANSFER] =
@@ -423,7 +423,7 @@ snes_usb_read_callback(struct usb_xfer *transfer, usb_error_t error)
 	struct usb_fifo *fifo = sc->sc_fifo_open[USB_FIFO_RX];
 	struct usb_page_cache *pc;
 	int actual, max;
-	uint8_t current_status[8];
+//	uint8_t current_status[8];
 	usbd_xfer_status(transfer, &actual, NULL, NULL, NULL);
 	uprintf("NO FIFO");
 	if(fifo == NULL)
@@ -445,10 +445,11 @@ snes_usb_read_callback(struct usb_xfer *transfer, usb_error_t error)
 				sc->sc_zero_length_packets = 0;
 			}
 			pc = usbd_xfer_get_frame(transfer, 0);
+			usb_fifo_put_data(fifo, pc, 0, actual, 1);
 			//while(actual){
-			usbd_copy_out(pc, 0, current_status, 8);
-			usb_fifo_put_data_linear(fifo, current_status + 1,  8, 1);
-			actual -=8;
+//			usbd_copy_out(pc, 0, current_status, 8);
+//			usb_fifo_put_data_linear(fifo, current_status + 1,  8, 1);
+			//actual -=8;
 			//}
 			/*FALLTHROUGH*/
 
