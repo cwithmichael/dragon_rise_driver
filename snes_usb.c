@@ -446,11 +446,6 @@ snes_usb_read_callback(struct usb_xfer *transfer, usb_error_t error)
 			}
 			pc = usbd_xfer_get_frame(transfer, 0);
 			usb_fifo_put_data(fifo, pc, 0, actual, 1);
-			//while(actual){
-//			usbd_copy_out(pc, 0, current_status, 8);
-//			usb_fifo_put_data_linear(fifo, current_status + 1,  8, 1);
-			//actual -=8;
-			//}
 			/*FALLTHROUGH*/
 
 setup:
