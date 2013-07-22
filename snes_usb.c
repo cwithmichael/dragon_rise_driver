@@ -108,7 +108,7 @@ static struct usb_fifo_methods snes_usb_fifo_methods = {
 	.f_ioctl = &snes_usb_ioctl,
 	.f_start_read =&snes_usb_start_read,
 	.f_stop_read = &snes_usb_stop_read,
-	.basename[0] = "snes_usb"
+	.basename[0] = "joy"
 };
 
 static const struct usb_config snes_usb_config[SNES_USB_N_TRANSFER] =
@@ -381,11 +381,12 @@ snes_usb_ioctl(struct usb_fifo *fifo, u_long cmd, void *data, int fflags)
 		error = EINVAL;
 		break;
 	}
+	device_printf(sc->sc_dev, "SOMEONE CAME\n");
 	return (error);
 
 		
-	device_printf(sc->sc_dev, "SOMEONE CAME\n");
-	return (ENODEV);
+
+	//	return (ENODEV);
 }
 
 static void
@@ -424,8 +425,10 @@ snes_usb_read_callback(struct usb_xfer *transfer, usb_error_t error)
 	int actual, max;
 	uint8_t current_status[8];
 	usbd_xfer_status(transfer, &actual, NULL, NULL, NULL);
+	uprintf("NO FIFO");
 	if(fifo == NULL)
 		return;
+	uprintf("READ_CALLBACK");
 	switch(USB_GET_STATE(transfer)){
 	
 		case USB_ST_TRANSFERRED:
@@ -442,15 +445,15 @@ snes_usb_read_callback(struct usb_xfer *transfer, usb_error_t error)
 				sc->sc_zero_length_packets = 0;
 			}
 			pc = usbd_xfer_get_frame(transfer, 0);
-			while(actual >= 8){
+			//while(actual){
 			usbd_copy_out(pc, 0, current_status, 8);
 			usb_fifo_put_data_linear(fifo, current_status + 1,  8, 1);
 			actual -=8;
-			}
+			//}
 			/*FALLTHROUGH*/
 
-		case USB_ST_SETUP:
 setup:
+	case USB_ST_SETUP:
 			if(usb_fifo_put_bytes_max(fifo) != 0){
 				max = usbd_xfer_max_len(transfer);
 				usbd_xfer_set_frame_len(transfer, 0, max);
@@ -480,7 +483,7 @@ snes_usb_status_callback(struct usb_xfer *transfer, usb_error_t error)
 	struct usb_device_request req;
 	struct usb_page_cache *pc;
 	uint8_t current_status, new_status;
-
+	uprintf("DON'T COME BACK");
 	switch(USB_GET_STATE(transfer)){
 		case USB_ST_SETUP:
 			req.bmRequestType = UT_READ_CLASS_INTERFACE;
@@ -502,6 +505,9 @@ snes_usb_status_callback(struct usb_xfer *transfer, usb_error_t error)
 			pc = usbd_xfer_get_frame(transfer, 1);
 			usbd_copy_out(pc, 0, &current_status, 1);
 			new_status = current_status & ~sc->sc_previous_status;
+			if(new_status & START){
+			  log(LOG_NOTICE, "START\n");
+			}
 			sc->sc_previous_status = current_status;
 			break;
 		default:
@@ -513,6 +519,7 @@ snes_usb_status_callback(struct usb_xfer *transfer, usb_error_t error)
 static int
 snes_usb_probe(device_t dev)
 {
+  uprintf("PROBING");
 	struct usb_attach_arg *uaa = device_get_ivars(dev);
 	
 	if(uaa->usb_mode != USB_MODE_HOST)
@@ -527,6 +534,7 @@ snes_usb_probe(device_t dev)
 static int
 snes_usb_attach(device_t dev)
 {
+  uprintf("ATTACHING");
 	struct usb_attach_arg *uaa = device_get_ivars(dev);
 	struct snes_usb_softc *sc = device_get_softc(dev);
 	struct usb_interface_descriptor *idesc;
@@ -559,6 +567,7 @@ snes_usb_attach(device_t dev)
 		
 		cdesc = usbd_get_config_descriptor(uaa->device);
 		idesc = (void *)usb_desc_foreach(cdesc, (void *)idesc);
+		goto found;
 	}
 	goto detach;
 
