@@ -6,6 +6,10 @@ You should probably set the global variable MAKEOBJDIR to a new directory within
 
 #kldload /some/directory/joy.ko
 
-Once you plug in the gamepad you should be able to use it with the emulator of your choice. I've only tested it with ZSNES and Snes9x.
+Once you plug in the gamepad you should be able to use it with the emulator of your choice. I've only tested it with ZSNES.
+
+Doesn't work with Snes9x at the moment. 
+It recognizes the device but that's about it.
+
 
 
