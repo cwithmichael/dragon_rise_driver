@@ -1,7 +1,7 @@
 Driver for Dragon Rise SNES USB controller
 You should probably set the global variable MAKEOBJDIR to a new directory within the source folder.
 
-#env MAKEOBJDIR /some/directory make
+#env MAKEOBJDIR=/some/directory make
 
 
 #kldload /some/directory/joy.ko
