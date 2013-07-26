@@ -102,7 +102,7 @@ static const struct usb_config snes_usb_config[SNES_USB_N_TRANSFER] =
 	{[SNES_USB_INTR_DT_RD] = {
 	.callback = &snes_usb_read_callback,
 	.bufsize = sizeof(struct usb_device_request) +1,
-	.flags = {.force_short_xfer = 1,.short_xfer_ok = 1, .short_frames_ok = 1, .pipe_bof =1, .proxy_buffer =1},
+	.flags = {.pipe_bof =1},
 	.type = UE_INTERRUPT,
 	.endpoint = 0x81,
 	.direction = UE_DIR_IN
@@ -465,26 +465,13 @@ static void
 snes_usb_status_callback(struct usb_xfer *transfer, usb_error_t error)
 {
 	struct snes_usb_softc *sc = usbd_xfer_softc(transfer);
-	struct usb_device_request req;
 	struct usb_page_cache *pc;
 	uint8_t current_status, new_status;
-	uprintf("DON'T COME BACK");
 	switch(USB_GET_STATE(transfer)){
 		case USB_ST_SETUP:
-			req.bmRequestType = UT_READ_CLASS_INTERFACE;
-			req.bRequest = UREQ_GET_PORT_STATUS;
-			USETW(req.wValue, 0);
-			req.wIndex[0] = sc->sc_iface_num;
-			req.wIndex[1] = 0;
-			USETW(req.wLength, 1);
-
-			pc = usbd_xfer_get_frame(transfer, 0);
-			usbd_copy_in(pc, 0, &req, sizeof(req));
-			usbd_xfer_set_frame_len(transfer, 0, sizeof(req));
-			usbd_xfer_set_frame_len(transfer, 1, 1);
-			usbd_xfer_set_frames(transfer, 2);
+			usbd_xfer_set_frames(transfer, 1);
+			usbd_xfer_set_frame_len(transfer, 0, 8);
 			usbd_transfer_submit(transfer);
-
 			break;
 		case USB_ST_TRANSFERRED:
 			pc = usbd_xfer_get_frame(transfer, 1);
