@@ -434,7 +434,7 @@ snes_usb_read_callback(struct usb_xfer *transfer, usb_error_t error)
 			}
 			usbd_xfer_set_interval(transfer, 0);
 			pc = usbd_xfer_get_frame(transfer, 0);
-			usb_fifo_put_data(fifo, pc, 0, actual, 1);
+			usb_fifo_put_data(fifo, pc, 0, 8, 1);
 			/*FALLTHROUGH*/
 
 	case USB_ST_SETUP:
