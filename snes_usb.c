@@ -556,7 +556,6 @@ found:
 		if(error)
 			goto detach;
 
-		uprintf("ITS A DRAGON\n");
 		error = usb_fifo_attach(uaa->device, sc, &sc->sc_mutex,
 			&snes_usb_fifo_methods, &sc->sc_fifo, unit, -1,
 			iface_index, UID_ROOT, GID_OPERATOR, 0644);
