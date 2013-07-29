@@ -33,6 +33,19 @@
 #define UREQ_GET_PORT_STATUS 0x01
 #define UREQ_SOFT_RESET      0x02
 
+#define UP     0x7f00
+#define DOWN   0x7fff
+#define LEFT   0x00ff
+#define RIGHT  0xff7f
+#define X      0x1f
+#define Y      0x8f
+#define A      0x2f
+#define B      0x4f
+#define SELECT 0x10
+#define START  0x20
+#define LEFT_T 0x01
+#define RIGHT_T 0x02
+
 static const uint8_t uhid_snes_usb_report_descr[] = {UHID_SNES_USB_REPORT_DESCR()};
 
 
@@ -102,7 +115,7 @@ static const struct usb_config snes_usb_config[SNES_USB_N_TRANSFER] =
 	{[SNES_USB_INTR_DT_RD] = {
 	.callback = &snes_usb_read_callback,
 	.bufsize = sizeof(struct usb_device_request) +1,
-	.flags = {.pipe_bof =1},
+	.flags = {.short_xfer_ok = 1, .short_frames_ok = 1, .pipe_bof =1, .proxy_buffer =1},
 	.type = UE_INTERRUPT,
 	.endpoint = 0x81,
 	.direction = UE_DIR_IN
@@ -110,7 +123,7 @@ static const struct usb_config snes_usb_config[SNES_USB_N_TRANSFER] =
 	[SNES_USB_STATUS_DT_RD] = {
 	.callback = &snes_usb_status_callback,
 	.bufsize = sizeof(struct usb_device_request) + 1,
-	.timeout = 5,
+	.timeout = 1000,
 	.type = UE_CONTROL,
 	.endpoint = 0x00,
 	.direction = UE_DIR_ANY
@@ -333,7 +346,6 @@ snes_usb_ioctl(struct usb_fifo *fifo, u_long cmd, void *data, int fflags)
 		break;
 
 	case USB_SET_REPORT:
-		uprintf("Setting report\n");
 		if (!(fflags & FWRITE)) {
 			error = EPERM;
 			break;
@@ -362,7 +374,6 @@ snes_usb_ioctl(struct usb_fifo *fifo, u_long cmd, void *data, int fflags)
 		break;
 
 	case USB_GET_REPORT_ID:
-		uprintf("Getting report\n");
 		*(int *)data = 0;	/* XXX: we only support reportid 0? */
 		break;
 
@@ -412,7 +423,9 @@ snes_usb_read_callback(struct usb_xfer *transfer, usb_error_t error)
 	struct usb_fifo *fifo = sc->sc_fifo_open[USB_FIFO_RX];
 	struct usb_page_cache *pc;
 	int actual, max;
+//	uint8_t current_status[8];
 	usbd_xfer_status(transfer, &actual, NULL, NULL, NULL);
+	uprintf("NO FIFO");
 	if(fifo == NULL)
 		return;
 	uprintf("READ_CALLBACK");
@@ -420,7 +433,6 @@ snes_usb_read_callback(struct usb_xfer *transfer, usb_error_t error)
 	
 		case USB_ST_TRANSFERRED:
 			if(actual == 0){
-				printf("ACTUAL");
 				if(sc->sc_zero_length_packets == 4)
 					/*Throttle transfers. */
 					usbd_xfer_set_interval(transfer, 500);
@@ -432,13 +444,17 @@ snes_usb_read_callback(struct usb_xfer *transfer, usb_error_t error)
 				usbd_xfer_set_interval(transfer, 0);
 				sc->sc_zero_length_packets = 0;
 			}
-			usbd_xfer_set_interval(transfer, 0);
 			pc = usbd_xfer_get_frame(transfer, 0);
-			usb_fifo_put_data(fifo, pc, 0, 8, 1);
+			usb_fifo_put_data(fifo, pc, 0, actual, 1);
+			//while(actual){
+//			usbd_copy_out(pc, 0, current_status, 8);
+//			usb_fifo_put_data_linear(fifo, current_status + 1,  8, 1);
+			//actual -=8;
+			//}
 			/*FALLTHROUGH*/
 
-	case USB_ST_SETUP:
 setup:
+	case USB_ST_SETUP:
 			if(usb_fifo_put_bytes_max(fifo) != 0){
 				max = usbd_xfer_max_len(transfer);
 				usbd_xfer_set_frame_len(transfer, 0, max);
@@ -465,18 +481,34 @@ static void
 snes_usb_status_callback(struct usb_xfer *transfer, usb_error_t error)
 {
 	struct snes_usb_softc *sc = usbd_xfer_softc(transfer);
+	struct usb_device_request req;
 	struct usb_page_cache *pc;
 	uint8_t current_status, new_status;
+	uprintf("DON'T COME BACK");
 	switch(USB_GET_STATE(transfer)){
 		case USB_ST_SETUP:
-			usbd_xfer_set_frames(transfer, 1);
-			usbd_xfer_set_frame_len(transfer, 0, 8);
+			req.bmRequestType = UT_READ_CLASS_INTERFACE;
+			req.bRequest = UREQ_GET_PORT_STATUS;
+			USETW(req.wValue, 0);
+			req.wIndex[0] = sc->sc_iface_num;
+			req.wIndex[1] = 0;
+			USETW(req.wLength, 1);
+
+			pc = usbd_xfer_get_frame(transfer, 0);
+			usbd_copy_in(pc, 0, &req, sizeof(req));
+			usbd_xfer_set_frame_len(transfer, 0, sizeof(req));
+			usbd_xfer_set_frame_len(transfer, 1, 1);
+			usbd_xfer_set_frames(transfer, 2);
 			usbd_transfer_submit(transfer);
+
 			break;
 		case USB_ST_TRANSFERRED:
 			pc = usbd_xfer_get_frame(transfer, 1);
 			usbd_copy_out(pc, 0, &current_status, 1);
 			new_status = current_status & ~sc->sc_previous_status;
+			if(new_status & START){
+			  log(LOG_NOTICE, "START\n");
+			}
 			sc->sc_previous_status = current_status;
 			break;
 		default:
@@ -556,6 +588,7 @@ found:
 		if(error)
 			goto detach;
 
+		uprintf("ITS A DRAGON\n");
 		error = usb_fifo_attach(uaa->device, sc, &sc->sc_mutex,
 			&snes_usb_fifo_methods, &sc->sc_fifo, unit, -1,
 			iface_index, UID_ROOT, GID_OPERATOR, 0644);
