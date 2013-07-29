@@ -148,7 +148,7 @@ uhid_get_report(struct snes_usb_softc *sc, uint8_t type,
 	}
 	err = usbd_req_get_report(sc->sc_udev, NULL, kern_data,
 	    len, sc->sc_iface_index, type, id);
-	uprintf((char *)kern_data);
+	printf((char *)kern_data);
 	if (err) {
 		err = ENXIO;
 		goto done;
@@ -204,7 +204,7 @@ done:
 static int
 snes_usb_open(struct usb_fifo *fifo, int fflags)
 {
-	uprintf("OPENING SNES USB\n");
+	printf("OPENING SNES USB\n");
 	struct snes_usb_softc *sc = usb_fifo_softc(fifo);
 	int error;
 	
@@ -257,7 +257,7 @@ snes_usb_reset(struct snes_usb_softc *sc)
 static void
 snes_usb_close(struct usb_fifo *fifo, int fflags)
 {
-	uprintf("CLOSING SNES USB\n");
+	printf("CLOSING SNES USB\n");
 	struct snes_usb_softc *sc = usb_fifo_softc(fifo);
 	
 	sc->sc_fflags &= ~(fflags & FREAD);
@@ -275,7 +275,6 @@ snes_usb_ioctl(struct usb_fifo *fifo, u_long cmd, void *data, int fflags)
 
 	switch(cmd){
 		case USB_GET_REPORT_DESC:
-			uprintf("GETTING REPORT DESC\n");
 			ugd = data;
 			if(sc->sc_repdesc_size > ugd->ugd_maxlen){
 				size = ugd->ugd_maxlen;
@@ -291,7 +290,6 @@ snes_usb_ioctl(struct usb_fifo *fifo, u_long cmd, void *data, int fflags)
 			break;
 
 		case USB_SET_IMMED:
-			uprintf("SET IMMED\n");
 			if(!(fflags & FREAD)){
 				error = EPERM;
 				break;
@@ -316,7 +314,6 @@ snes_usb_ioctl(struct usb_fifo *fifo, u_long cmd, void *data, int fflags)
 		break;
 
 	case USB_GET_REPORT:
-		uprintf("GETTING REPORT\n");
 		if (!(fflags & FREAD)) {
 			error = EPERM;
 			break;
@@ -326,7 +323,7 @@ snes_usb_ioctl(struct usb_fifo *fifo, u_long cmd, void *data, int fflags)
 		case UHID_INPUT_REPORT:
 			size = sc->sc_isize;
 			id = sc->sc_iid;
-			uprintf("%d \n", id);
+			printf("%d \n", id);
 			break;
 		case UHID_OUTPUT_REPORT:
 			size = sc->sc_osize;
@@ -374,14 +371,14 @@ snes_usb_ioctl(struct usb_fifo *fifo, u_long cmd, void *data, int fflags)
 		break;
 
 	case USB_GET_REPORT_ID:
-		*(int *)data = 0;	/* XXX: we only support reportid 0? */
+		/* XXX: we only support reportid 0? */
+		*(int *)data = 0;
 		break;
 
 	default:
 		error = EINVAL;
 		break;
 	}
-	device_printf(sc->sc_dev, "SOMEONE CAME\n");
 	return (error);
 
 		
@@ -425,10 +422,8 @@ snes_usb_read_callback(struct usb_xfer *transfer, usb_error_t error)
 	int actual, max;
 //	uint8_t current_status[8];
 	usbd_xfer_status(transfer, &actual, NULL, NULL, NULL);
-	uprintf("NO FIFO");
 	if(fifo == NULL)
 		return;
-	uprintf("READ_CALLBACK");
 	switch(USB_GET_STATE(transfer)){
 	
 		case USB_ST_TRANSFERRED:
@@ -484,7 +479,6 @@ snes_usb_status_callback(struct usb_xfer *transfer, usb_error_t error)
 	struct usb_device_request req;
 	struct usb_page_cache *pc;
 	uint8_t current_status, new_status;
-	uprintf("DON'T COME BACK");
 	switch(USB_GET_STATE(transfer)){
 		case USB_ST_SETUP:
 			req.bmRequestType = UT_READ_CLASS_INTERFACE;
@@ -520,7 +514,6 @@ snes_usb_status_callback(struct usb_xfer *transfer, usb_error_t error)
 static int
 snes_usb_probe(device_t dev)
 {
-  uprintf("PROBING");
 	struct usb_attach_arg *uaa = device_get_ivars(dev);
 	
 	if(uaa->usb_mode != USB_MODE_HOST)
@@ -535,7 +528,6 @@ snes_usb_probe(device_t dev)
 static int
 snes_usb_attach(device_t dev)
 {
-  uprintf("ATTACHING");
 	struct usb_attach_arg *uaa = device_get_ivars(dev);
 	struct snes_usb_softc *sc = device_get_softc(dev);
 	struct usb_interface_descriptor *idesc;
@@ -588,7 +580,6 @@ found:
 		if(error)
 			goto detach;
 
-		uprintf("ITS A DRAGON\n");
 		error = usb_fifo_attach(uaa->device, sc, &sc->sc_mutex,
 			&snes_usb_fifo_methods, &sc->sc_fifo, unit, -1,
 			iface_index, UID_ROOT, GID_OPERATOR, 0644);
