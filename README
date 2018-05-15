@@ -1,4 +1,12 @@
 Driver for Dragon Rise SNES USB controller
+
+From revision 333633 this driver is now part of FreeBSD base.  
+https://svnweb.freebsd.org/base?view=revision&revision=333633
+
+The device will show up as /dev/uhid_snes when plugged in.
+
+---
+
 You should probably set the global variable MAKEOBJDIR to a new directory within the source folder.
 
 #env MAKEOBJDIR=/some/directory make
